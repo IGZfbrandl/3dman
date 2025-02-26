@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Man Waving EPM Flag</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Load Three.js from CDN -->
+    <script src="https://unpkg.com/three@0.132.2/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    
+    <script>
+        // Initialize the scene, camera, and renderer
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky blue background
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.5, 5);
+        camera.lookAt(0, 1, 0);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        
+        // Add OrbitControls for camera manipulation
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.25;
+        controls.maxPolarAngle = Math.PI / 1.5;
+        controls.minDistance = 3;
+        controls.maxDistance = 10;
+        
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+        
+        // Create a ground
+        const groundGeometry = new THREE.PlaneGeometry(10, 10);
+        const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x4CAF50 });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -1;
+        scene.add(ground);
+        
+        // Create a simple man figure
+        function createMan() {
+            const man = new THREE.Group();
+            man.position.y = 0.375; // Raise the man so feet touch the ground at y=-1
+            
+            // Head
+            const headGeometry = new THREE.SphereGeometry(0.25, 32, 32);
+            const headMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.5;
+            man.add(head);
+            
+            // Body
+            const bodyGeometry = new THREE.CylinderGeometry(0.25, 0.25, 1, 32);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x3F51B5 });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.75;
+            man.add(body);
+            
+            // Arms
+            const armGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.5, 32);
+            const armMaterial = new THREE.MeshStandardMaterial({ color: 0x3F51B5 });
+            
+            // Left arm (static)
+            const leftShoulderJoint = new THREE.Group();
+            leftShoulderJoint.position.set(-0.25, 1.25, 0); // Shoulder position
+            man.add(leftShoulderJoint);
+            
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.rotation.z = Math.PI / 2; // Make it horizontal
+            leftArm.position.set(-0.25, 0, 0); // Move it out from the center of rotation
+            leftShoulderJoint.add(leftArm);
+            leftShoulderJoint.rotation.z = Math.PI / 4; // Then rotate the whole arm down
+            
+            // Right arm (will hold the flag)
+            const rightShoulderJoint = new THREE.Group();
+            rightShoulderJoint.position.set(0.25, 1.25, 0); // Shoulder position
+            man.add(rightShoulderJoint);
+            
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.rotation.z = Math.PI / 2; // Make it horizontal
+            rightArm.position.set(0.25, 0, 0); // Move it out from the center of rotation
+            rightShoulderJoint.add(rightArm);
+            
+            // Legs
+            const legGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.75, 32);
+            const legMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(-0.15, 0.125, 0);
+            man.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(0.15, 0.125, 0);
+            man.add(rightLeg);
+            
+            return { man, rightShoulderJoint };
+        }
+        
+        // Create the flag with "EPM" text
+        function createFlag() {
+            const flagGroup = new THREE.Group();
+            
+            // Flag pole
+            const poleGeometry = new THREE.CylinderGeometry(0.03, 0.03, 1.5, 16);
+            const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+            const pole = new THREE.Mesh(poleGeometry, poleMaterial);
+            pole.position.y = 0.75;
+            flagGroup.add(pole);
+            
+            // Flag cloth - create as a grid of smaller segments to animate wave
+            const flagWidth = 1.5;
+            const flagHeight = 1;
+            const segmentsX = 15;
+            const segmentsY = 10;
+            
+            const flagGeometry = new THREE.PlaneGeometry(
+                flagWidth, flagHeight, segmentsX, segmentsY
+            );
+            
+            // Create a canvas to draw the "EPM" text
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 256;
+            const context = canvas.getContext('2d');
+            
+            // Fill with a background color - now BLUE
+            context.fillStyle = '#0000FF'; // Blue background
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add a border for better visibility
+            context.strokeStyle = '#FFD700'; // Gold border
+            context.lineWidth = 10;
+            context.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+            
+            // Add "EPM" text
+            context.fillStyle = '#FFFFFF'; // White text
+            context.font = 'bold 120px Arial';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText('EPM', canvas.width / 2, canvas.height / 2);
+            
+            // Create texture from the canvas
+            const flagTexture = new THREE.CanvasTexture(canvas);
+            flagTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            
+            const flagMaterial = new THREE.MeshStandardMaterial({
+                map: flagTexture,
+                side: THREE.DoubleSide,
+                transparent: true
+            });
+            
+            const flag = new THREE.Mesh(flagGeometry, flagMaterial);
+            flag.position.set(flagWidth / 2, 1.25, 0);
+            flagGroup.add(flag);
+            
+            // We'll save the original vertices to animate them later
+            const originalVertices = [];
+            const positions = flagGeometry.attributes.position.array;
+            for (let i = 0; i < positions.length; i++) {
+                originalVertices.push(positions[i]);
+            }
+            flag.userData.originalVertices = originalVertices;
+            
+            return { flagGroup, flag };
+        }
+        
+        // Create the man and flag
+        const { man, rightShoulderJoint } = createMan();
+        scene.add(man);
+        
+        const { flagGroup, flag } = createFlag();
+        // Attach the flag to the man's right hand
+        flagGroup.position.set(0.5, 0, 0); // Position at the end of the arm
+        rightShoulderJoint.add(flagGroup);
+        
+        // Animation
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Update controls
+            controls.update();
+            
+            // Get time for animations
+            const time = Date.now() * 0.001;
+            
+            // Wave the flag by modifying vertices
+            if (flag.geometry.attributes.position.array) {
+                const positions = flag.geometry.attributes.position.array;
+                const originalVertices = flag.userData.originalVertices;
+                
+                for (let i = 0; i < positions.length; i += 3) {
+                    // Get original x coordinate (which is the distance from the pole)
+                    const x = originalVertices[i];
+                    
+                    // Create a wave effect that increases in amplitude further from the pole
+                    const waveAmplitude = 0.1 * Math.abs(x); // Amplitude increases with distance from pole
+                    const waveFrequency = 3;
+                    const wavePhase = time * 5; // Speed of the wave
+                    
+                    // Apply wave to z-coordinate (perpendicular to flag face)
+                    positions[i + 2] = Math.sin(x * waveFrequency + wavePhase) * waveAmplitude;
+                }
+                
+                flag.geometry.attributes.position.needsUpdate = true;
+            }
+            
+            // Animate the arm waving with improved physics
+            rightShoulderJoint.rotation.z = -Math.PI / 4 + Math.sin(time * 2) * 0.4; // More natural arm motion
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
